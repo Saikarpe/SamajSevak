@@ -1,0 +1,124 @@
+{
+  "train_size": 1584,
+  "test_size": 396,
+  "classes": [
+    "Drainage & Sewage",
+    "Electricity",
+    "Encroachment",
+    "Garbage & Sanitation",
+    "Public Health",
+    "Public Transport",
+    "Roads & Potholes",
+    "Safety & Law",
+    "Street Lights",
+    "Tree & Parks",
+    "Water Supply"
+  ],
+  "test_accuracy": 1.0,
+  "test_macro_f1": 1.0,
+  "holdout_accuracy": 0.8182,
+  "holdout_size": 22,
+  "holdout_errors": [
+    {
+      "text": "The tap water smells like sewage and my kids fell ill",
+      "true": "Water Supply",
+      "pred": "Drainage & Sewage"
+    },
+    {
+      "text": "A crater-like hole has formed on the highway service road, bikers keep skidding",
+      "true": "Roads & Potholes",
+      "pred": "Public Transport"
+    },
+    {
+      "text": "Rubbish heap near the corner has not been picked up and rats everywhere",
+      "true": "Garbage & Sanitation",
+      "pred": "Safety & Law"
+    },
+    {
+      "text": "Sweepers have not cleaned our street for many days",
+      "true": "Garbage & Sanitation",
+      "pred": "Street Lights"
+    }
+  ],
+  "report": {
+    "Drainage & Sewage": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 36.0
+    },
+    "Electricity": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 36.0
+    },
+    "Encroachment": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 36.0
+    },
+    "Garbage & Sanitation": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 36.0
+    },
+    "Public Health": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 36.0
+    },
+    "Public Transport": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 36.0
+    },
+    "Roads & Potholes": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 36.0
+    },
+    "Safety & Law": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 36.0
+    },
+    "Street Lights": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 36.0
+    },
+    "Tree & Parks": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 36.0
+    },
+    "Water Supply": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 36.0
+    },
+    "accuracy": 1.0,
+    "macro avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 396.0
+    },
+    "weighted avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 396.0
+    }
+  }
+}
