@@ -16,6 +16,16 @@ from app.knowledge import (CATEGORIES, INTENSIFIERS, NEGATIVE_WORDS, POSITIVE_WO
 
 MODEL_PATH = Path(__file__).resolve().parents[2] / "models" / "classifier.joblib"
 WORD_RE = re.compile(r"[a-z']+")
+BOILERPLATE = re.compile(
+    r"(respected sir,?|dear team,?|hello,?|sir/madam,?|this is to bring to your notice that|i want to complain that|"
+    r"kindly look into this:?|please help\.?|please take action\.?|kindly resolve urgently\.?|please do the needful\.?|"
+    r"nobody is responding to our calls\.?|we are really frustrated\.?|complaint already given twice but still ignored\.?|"
+    r"thank you\.?)", re.I)
+
+
+def core_text(text: str) -> str:
+    """Strip greetings / sign-offs so similarity focuses on the actual issue."""
+    return " ".join(BOILERPLATE.sub(" ", text).split()) or text
 
 
 class Engine:
@@ -35,12 +45,15 @@ class Engine:
             self.vectorizer, self.matrix = None, None
             return
         self.vectorizer = TfidfVectorizer(ngram_range=(1, 2), sublinear_tf=True, stop_words="english")
-        self.matrix = self.vectorizer.fit_transform([r["text"] for r in rows])
+        self.matrix = self.vectorizer.fit_transform([core_text(r["text"]) for r in rows])
 
-    def similar(self, text: str, k: int = 5, exclude_id: str | None = None):
+    def similar(self, text: str, k: int = 5, exclude_id: str | None = None, category: str | None = None):
         if self.vectorizer is None:
             return []
-        sims = cosine_similarity(self.vectorizer.transform([text]), self.matrix)[0]
+        sims = cosine_similarity(self.vectorizer.transform([core_text(text)]), self.matrix)[0]
+        if category:  # semantic + category-aware re-ranking
+            same = np.array([r["category"] == category for r in self.corpus_rows])
+            sims = np.where(same, sims + 0.1, sims * 0.6)
         order = np.argsort(-sims)
         out = []
         for i in order:
@@ -49,7 +62,7 @@ class Engine:
                 continue
             if sims[i] < 0.12 or len(out) >= k:
                 break
-            out.append({**r, "similarity": round(float(sims[i]), 3)})
+            out.append({**r, "similarity": round(min(1.0, float(sims[i])), 3)})
         return out
 
     # ---------------- components ----------------
@@ -98,7 +111,9 @@ class Engine:
         lm = re.search(r"\b(near|opposite|behind|next to|beside|outside|in front of)\s+(the\s+)?([a-z0-9 .'-]{3,40}?)(?=[,.]| in | and |$)", low)
         if lm:
             landmark = (lm.group(1) + " " + (lm.group(3) or "")).strip()
-        urgency = sorted({t for t in URGENCY_TERMS if t in low}, key=lambda t: -URGENCY_TERMS[t])
+        found = {t for t in URGENCY_TERMS if re.search(rf"\b{re.escape(t)}", low)}
+        found = {t for t in found if not any(t != o and t in o for o in found)}  # drop 'danger' if 'dangerous'
+        urgency = sorted(found, key=lambda t: -URGENCY_TERMS[t])
         vulnerable = sorted({t for t in VULNERABLE_TERMS if re.search(rf"\b{re.escape(t)}\b", low)})
         return {"ward": ward, "duration_days": days, "landmark": landmark,
                 "urgency_terms": urgency, "vulnerable_groups": vulnerable}
@@ -125,7 +140,7 @@ class Engine:
         if repeat:
             factors.append({"factor": "Repeat complaint / earlier ignored", "points": 6.0})
         score = round(min(100.0, sum(f["points"] for f in factors)), 1)
-        level = "Critical" if score >= 70 else "High" if score >= 50 else "Medium" if score >= 32 else "Low"
+        level = "Critical" if score >= 60 else "High" if score >= 42 else "Medium" if score >= 25 else "Low"
         return score, level, factors
 
     # ---------------- recommendations ----------------
@@ -139,7 +154,8 @@ class Engine:
             steps.insert(0, "Escalate to ward officer and field team within 2 hours (high-risk case)")
         if ents["vulnerable_groups"]:
             steps.append("Inform citizen of interim safety measures for " + ", ".join(ents["vulnerable_groups"]))
-        resolved = [s for s in similar if s.get("status") == "Resolved" and s.get("resolution_note")]
+        resolved = [s for s in similar if s.get("status") == "Resolved" and s.get("resolution_note")
+                    and s.get("category") == category]
         proven = Counter(s["resolution_note"] for s in resolved).most_common(3)
         hours = [s["resolution_hours"] for s in resolved if s.get("resolution_hours")]
         sla = CATEGORIES[category]["sla_hours"]
@@ -165,11 +181,15 @@ class Engine:
 
     @staticmethod
     def summarize(text: str, category: str, ward: str | None):
-        first = re.split(r"(?<=[.!?])\s+", text.strip())
-        core = next((s for s in first if len(s) > 15 and not s.lower().startswith(("respected", "dear", "hello", "sir"))), first[0])
-        core = re.sub(r"^(respected sir,|dear team,|hello,|sir/madam,|this is to bring to your notice that|i want to complain that|kindly look into this:|please help\.)\s*", "", core, flags=re.I)
-        core = core[:90].rstrip(" ,.") + ("…" if len(core) > 90 else "")
-        return f"{core[0].upper() + core[1:] if core else category}" + (f" — {ward}" if ward else "")
+        body = core_text(text)
+        sentences = [x for x in re.split(r"(?<=[.!?])\s+", body) if len(x) > 8] or [body]
+        core = sentences[0].strip()
+        if len(core) > 80:
+            cut = core[:80]
+            core = cut[:cut.rfind(" ")].rstrip(" ,.") + "…"
+        core = core.rstrip(" .")
+        core = core[0].upper() + core[1:] if core else category
+        return core + (f" — {ward}" if ward and ward.lower() not in core.lower() else "")
 
     # ---------------- full pipeline ----------------
     def analyze(self, text: str, ward: str | None = None, exclude_id: str | None = None):
@@ -178,7 +198,7 @@ class Engine:
         ents = self.entities(text)
         ward = ward or ents["ward"]
         senti = self.sentiment(text)
-        similar = self.similar(text, k=8, exclude_id=exclude_id)
+        similar = self.similar(text, k=8, exclude_id=exclude_id, category=category)
         same_area_open = [s for s in similar if s.get("ward") == ward and s.get("category") == category
                           and s.get("status") != "Resolved" and s["similarity"] >= 0.25]
         duplicates = [s for s in same_area_open if s["similarity"] >= 0.55]
