@@ -156,7 +156,9 @@ URGENCY_TERMS = {
     "contaminated": 0.8, "dirty water": 0.7, "vomiting": 0.8, "diarrhea": 0.8, "food poisoning": 0.9,
     "harassment": 0.9, "theft": 0.7, "robbery": 0.9, "unsafe": 0.7, "stalking": 0.9, "chain snatching": 0.8,
     "open manhole": 0.9, "overflowing": 0.5, "no water": 0.6, "no electricity": 0.6, "power cut": 0.5,
-    "fallen tree": 0.7, "blocked road": 0.5,
+    "fallen tree": 0.7, "blocked road": 0.5, "live electric wire": 1.0, "hanging low": 0.6,
+    "breathing problem": 0.7, "smoke": 0.6, "admitted": 0.8, "ambulance": 0.8, "fell inside": 0.9, "got stuck": 0.6,
+    "cave-in": 0.8, "about to fall": 0.8, "about to collapse": 0.9,
 }
 VULNERABLE_TERMS = {
     "children": 0.6, "child": 0.6, "school": 0.5, "kids": 0.6, "elderly": 0.6, "senior citizen": 0.6,
