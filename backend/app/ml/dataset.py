@@ -178,8 +178,29 @@ def generate_history(n: int = 420, seed: int = 11):
         out.append({"category": cat, "ward": ward,
                     "text": _fill(rng.choice(T[cat]), rng, ward),
                     "resolution": rng.choice(RESOLUTION_NOTES[cat])})
+    for text, cat, ward in CRITICAL_SAMPLES:
+        out.append({"category": cat, "ward": ward, "text": text, "resolution": rng.choice(RESOLUTION_NOTES[cat]), "recent": True})
     for _ in range(18):
         cat = rng.choice(["Drainage & Sewage", "Public Health"])
         out.append({"category": cat, "ward": "Hadapsar", "text": _fill(rng.choice(T[cat]), rng, "Hadapsar"),
                     "resolution": rng.choice(RESOLUTION_NOTES[cat]), "recent": True})
     return out
+
+
+CRITICAL_SAMPLES = [
+    ("Live electric wire has fallen on the road near the primary school in Kothrud since yesterday. Children walk here daily, this is extremely dangerous!", "Electricity", "Kothrud"),
+    ("Open manhole on the main road in Hadapsar without any cover. An elderly man fell inside last night and was injured. Please act immediately.", "Drainage & Sewage", "Hadapsar"),
+    ("Dirty contaminated water coming in taps in Hadapsar for 4 days. Many children vomiting and diarrhea cases. Complaint given twice but still ignored.", "Water Supply", "Hadapsar"),
+    ("Suspected dengue outbreak in our society in Hadapsar, 9 people admitted to hospital with fever. Urgent fogging needed.", "Public Health", "Hadapsar"),
+    ("Transformer sparking and small fire near the vegetable market in Yerawada. Very dangerous, shops around.", "Electricity", "Yerawada"),
+    ("Big tree fallen on the road in Aundh after storm blocking the ambulance route to the hospital. Emergency!", "Tree & Parks", "Aundh"),
+    ("Chain snatching and harassment of women near the bus stop in Katraj every evening, street is unsafe and dark.", "Safety & Law", "Katraj"),
+    ("Road cave-in near the railway crossing in Swargate, two bikers had an accident yesterday. Very dangerous hazard.", "Roads & Potholes", "Swargate"),
+    ("Sewage mixing with drinking water line in Hadapsar lane no. 4, people getting fever and diarrhea. Pregnant women and kids at risk.", "Drainage & Sewage", "Hadapsar"),
+    ("Electric pole about to collapse near the school in Wakad, live wire hanging low. Kids in danger.", "Electricity", "Wakad"),
+    ("No water supply in Kharadi for 6 days, elderly and patients are suffering. Nobody responds, we are totally frustrated!", "Water Supply", "Kharadi"),
+    ("Street lights not working for 2 weeks near the college in Viman Nagar, girls are afraid and a stalking incident happened.", "Street Lights", "Viman Nagar"),
+    ("Garbage burning every night in Baner near the hospital, smoke causing breathing problems for patients and children.", "Garbage & Sanitation", "Baner"),
+    ("Flooding in the underpass in Shivajinagar due to choked storm water drain, a car got stuck. Dangerous.", "Drainage & Sewage", "Shivajinagar"),
+    ("Food poisoning — 15 students vomiting after eating at the canteen stall near the school in Hinjewadi.", "Public Health", "Hinjewadi"),
+]
