@@ -16,28 +16,13 @@
   ],
   "test_accuracy": 1.0,
   "test_macro_f1": 1.0,
-  "holdout_accuracy": 0.8182,
+  "holdout_accuracy": 0.9545,
   "holdout_size": 22,
   "holdout_errors": [
     {
       "text": "The tap water smells like sewage and my kids fell ill",
       "true": "Water Supply",
       "pred": "Drainage & Sewage"
-    },
-    {
-      "text": "A crater-like hole has formed on the highway service road, bikers keep skidding",
-      "true": "Roads & Potholes",
-      "pred": "Public Transport"
-    },
-    {
-      "text": "Rubbish heap near the corner has not been picked up and rats everywhere",
-      "true": "Garbage & Sanitation",
-      "pred": "Safety & Law"
-    },
-    {
-      "text": "Sweepers have not cleaned our street for many days",
-      "true": "Garbage & Sanitation",
-      "pred": "Street Lights"
     }
   ],
   "report": {

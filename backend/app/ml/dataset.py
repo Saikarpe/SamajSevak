@@ -22,6 +22,9 @@ CLOSERS = ["", " Please take action.", " Kindly resolve urgently.", " Nobody is 
 
 T = {
     "Water Supply": [
+        "Taps are dry {loc} {dur}, buying water cans",
+        "Tap water is smelly and unfit to drink {loc}",
+        "Borewell and municipal water both stopped {loc} {dur}",
         "No water supply {loc} {dur}", "Water is coming very low pressure {loc} {dur}",
         "Drinking water pipeline is leaking {loc} and lot of water is wasted",
         "Dirty and contaminated water is coming from taps {loc} {dur}",
@@ -32,6 +35,9 @@ T = {
         "Water meter is broken and bill is wrong, supply stopped {loc}",
     ],
     "Roads & Potholes": [
+        "Deep hole on the service road {loc}, vehicles skidding",
+        "Tar washed away from the road {loc} after rain",
+        "Crater on the highway stretch {loc} {dur}",
         "Huge potholes on the road {loc} causing accidents", "Road is completely damaged {loc} {dur}",
         "Big pothole {loc}, two wheeler riders fell down yesterday",
         "Road digging work left incomplete {loc} {dur}", "Speed breaker is broken and unmarked {loc}",
@@ -41,6 +47,8 @@ T = {
         "Uneven road surface and gravel spread {loc} {dur}",
     ],
     "Electricity": [
+        "Whole building without power {loc} {dur}, inverter dead",
+        "Loud blast in transformer {loc} and smoke coming",
         "No electricity {loc} {dur}", "Frequent power cuts {loc} every evening",
         "Transformer sparking {loc}, risk of fire", "Live wire fallen on the road {loc}, very dangerous",
         "Bijli nahi hai {loc} {dur}", "Voltage fluctuation damaged our appliances {loc}",
@@ -49,6 +57,9 @@ T = {
         "Power outage for 12 hours {loc}, patients on oxygen concentrators struggling",
     ],
     "Garbage & Sanitation": [
+        "Rubbish heap not picked up {loc}, rats and flies everywhere",
+        "Sweepers have not cleaned the street {loc} {dur}",
+        "Waste bins not emptied {loc}, bad odour",
         "Garbage not collected {loc} {dur}", "Huge garbage dump {loc} and it is stinking",
         "Kachra gadi nahi aayi {dur} {loc}", "Dustbin overflowing {loc}, stray dogs spreading waste",
         "People burning garbage {loc}, smoke causing breathing problems",
@@ -64,6 +75,8 @@ T = {
         "Chamber overflowing in front of houses {loc}", "Waterlogging in basement due to blocked drains {loc}",
     ],
     "Street Lights": [
+        "Pitch dark on the street at night {loc}, lamps dead",
+        "Pole light off {loc} {dur}",
         "Street lights not working {loc} {dur}", "Entire lane is dark at night {loc}, feels unsafe",
         "Street light pole damaged {loc}", "Street lights remain on during the day {loc}, wasting electricity",
         "Batti band hai {loc} {dur}", "Flickering street light {loc} {dur}",
@@ -71,6 +84,7 @@ T = {
         "Several street lamps fused {loc}", "Street light timer faulty {loc}",
     ],
     "Public Health": [
+        "High fever and platelet count dropping in many neighbours {loc}",
         "Many dengue cases {loc}, please do fogging", "Mosquito menace {loc} {dur}, fever cases increasing",
         "Food poisoning after eating at a stall {loc}", "Stray dog bite cases rising {loc}",
         "Stagnant water breeding mosquitoes {loc}, malaria spreading",
@@ -98,6 +112,8 @@ T = {
         "Stalking of school girls {loc}, need police patrolling",
     ],
     "Tree & Parks": [
+        "Tree collapsed on parked cars {loc} during the storm",
+        "Slide and swings rusted in the garden {loc}",
         "Big tree fallen on the road {loc} after rain", "Dangerous dry tree may fall {loc}",
         "Park swings broken {loc}, children getting hurt", "Garden not maintained {loc} {dur}",
         "Tree branches touching electric wires {loc}", "Park lights not working and gate broken {loc}",
