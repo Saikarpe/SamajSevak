@@ -11,8 +11,36 @@ import numpy as np
 
 MODEL = os.getenv("SAMAJSEVAK_EMBED_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
 CACHE_DIR = Path(os.getenv("FASTEMBED_CACHE_PATH", Path(__file__).resolve().parents[2] / "models" / "fastembed_cache"))
+MIN_MEMORY_MB = 1024  # the model plus ONNX Runtime need about 0.5 GB on top of the app
+
+
+def _memory_limit_mb():
+    """The container's memory limit (cgroup v2, then v1), or None when there is none / not Linux."""
+    for path in ("/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"):
+        try:
+            value = Path(path).read_text().strip()
+        except OSError:
+            continue
+        if value.isdigit():
+            return int(value) / 2 ** 20
+    return None
+
+
+def _disabled() -> bool:
+    """SAMAJSEVAK_EMBEDDINGS=0/1 decides when set. Unset: on, except in a container too small to hold
+    the model (a 512 MB free instance is killed for running out of memory during startup)."""
+    setting = os.getenv("SAMAJSEVAK_EMBEDDINGS")
+    if setting is not None:
+        return setting == "0"
+    limit = _memory_limit_mb()
+    if limit is not None and limit < MIN_MEMORY_MB:
+        print(f"[embed] container memory limit is {limit:.0f} MB; embeddings off, using TF-IDF only")
+        return True
+    return False
+
+
 _model = None
-_failed = os.getenv("SAMAJSEVAK_EMBEDDINGS", "1") == "0"
+_failed = _disabled()
 _memo: dict[str, np.ndarray] = {}
 _unsaved = 0
 DISK_CACHE = CACHE_DIR.parent / "embedding_cache.npz"  # vectors keyed by text hash; safe to delete
