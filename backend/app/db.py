@@ -23,9 +23,36 @@ CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     grievance_id TEXT, ts TEXT, status TEXT, note TEXT, actor TEXT
 );
+CREATE TABLE IF NOT EXISTS officers (
+    username TEXT PRIMARY KEY, name TEXT, salt BLOB, pw_hash BLOB, demo INTEGER DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS citizens (
+    id TEXT PRIMARY KEY, name TEXT, phone TEXT UNIQUE, created_at TEXT
+);
 CREATE INDEX IF NOT EXISTS idx_g_status ON grievances(status);
 CREATE INDEX IF NOT EXISTS idx_g_created ON grievances(created_at);
 """
+# Columns added after the first release; applied to old databases on startup.
+#   geo_source    gps | pin | seed (a real point)  or  ward (ward centre, approximate)
+#   label_source  ai | officer (category confirmed or corrected by a person -> training data)
+#
+# Master issues. Every row in `grievances` is one citizen report and is never deleted. The report
+# whose master_id is its own id IS the master issue: it carries the operational state (status,
+# assignee, stage, resolution) and that state is copied onto every report linked to it.
+#   master_id           the issue this report belongs to
+#   association_source  CITIZEN (joined it) | AI (matched after submission) | OFFICER; NULL on a master
+#   stage / stage_due   escalation stage of the issue and when it next escalates
+#   satisfaction        this citizen's own answer once resolved: Satisfied | Not Satisfied | NULL (no response)
+#   ip_hash             salted hash for abuse signals only; never returned by any API
+MIGRATIONS = {"geo_source": "TEXT DEFAULT 'ward'", "language": "TEXT", "photo": "TEXT", "photo_check": "TEXT",
+              "resolution_photo": "TEXT", "label_source": "TEXT DEFAULT 'ai'",
+              "master_id": "TEXT", "association_source": "TEXT", "association_note": "TEXT", "citizen_id": "TEXT",
+              "ai_category": "TEXT", "citizen_category": "TEXT", "classification_source": "TEXT DEFAULT 'AI'",
+              "stage": "TEXT DEFAULT 'Complaint'", "stage_due": "TEXT", "satisfaction": "TEXT", "feedback_text": "TEXT",
+              "photo_sha": "TEXT", "photo_phash": "TEXT", "ip_hash": "TEXT", "review_signals": "TEXT",
+              "abuse_review": "INTEGER DEFAULT 0"}
+EVENT_MIGRATIONS = {"actor_type": "TEXT", "prev_state": "TEXT", "new_state": "TEXT"}
+UPLOADS = DB_PATH.parent / "uploads"
 
 
 @contextmanager
@@ -43,10 +70,19 @@ def conn():
 def init():
     with conn() as c:
         c.executescript(SCHEMA)
+        for table, cols in (("grievances", MIGRATIONS), ("events", EVENT_MIGRATIONS)):
+            have = {r["name"] for r in c.execute(f"PRAGMA table_info({table})")}
+            for col, ddl in cols.items():
+                if col not in have:
+                    c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
+        # reports created before master issues existed: each becomes its own issue at the Complaint stage
+        c.execute("UPDATE grievances SET master_id=id, stage_due=sla_due, ai_category=category WHERE master_id IS NULL")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_g_master ON grievances(master_id)")
 
 
 def row_to_dict(r: sqlite3.Row) -> dict:
     d = dict(r)
-    if d.get("analysis"):
-        d["analysis"] = json.loads(d["analysis"])
+    for k in ("analysis", "photo_check", "review_signals"):
+        if d.get(k):
+            d[k] = json.loads(d[k])
     return d

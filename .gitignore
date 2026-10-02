@@ -7,3 +7,7 @@ node_modules/
 frontend/dist/
 .env
 .DS_Store
+backend/data/uploads/
+backend/models/fastembed_cache/
+backend/models/embedding_cache.npz
+*.previous.pptx

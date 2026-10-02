@@ -11,6 +11,10 @@ WORKDIR /app
 COPY backend/requirements.txt backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt
 COPY backend/ backend/
+# bake the multilingual embedding model into the image so the container starts offline;
+# skipped when the service runs with SAMAJSEVAK_EMBEDDINGS=0 (Render passes env vars as build args)
+ARG SAMAJSEVAK_EMBEDDINGS=1
+RUN if [ "$SAMAJSEVAK_EMBEDDINGS" = "1" ]; then cd backend && python -c "from app.ml import embed; assert embed.available()"; fi
 COPY --from=web /web/dist frontend/dist
 WORKDIR /app/backend
 ENV PORT=8000

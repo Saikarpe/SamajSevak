@@ -4,7 +4,7 @@ import { Bar as RBar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveCo
 import { api, fmtHours, PRIORITY_COLORS } from '../api'
 import { Bar, Card } from '../components/ui'
 
-const SENT = { Negative: '#ef4444', Neutral: '#94a3b8', Positive: '#22c55e' }
+const SENT = { Negative: '#dc2626', Neutral: '#8a949e', Positive: '#16a34a' }
 
 export default function Insights() {
   const [hs, setHs] = useState(null)
@@ -21,7 +21,7 @@ export default function Insights() {
             <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             {hs.wards.map((w) => (
               <CircleMarker key={w.ward} center={[w.lat, w.lng]} radius={10 + 22 * (w.open / maxOpen)}
-                pathOptions={{ color: w.critical / w.open > 0.4 ? '#dc2626' : '#f97316', fillOpacity: 0.25, weight: 1.5 }}>
+                pathOptions={{ color: w.critical / w.open > 0.4 ? '#dc2626' : '#ea580c', fillOpacity: 0.25, weight: 1.5 }}>
                 <LTooltip><b>{w.ward}</b><br />{w.open} open · {w.critical} high/critical<br />Top issue: {w.top_category} ({w.top_count})</LTooltip>
               </CircleMarker>
             ))}
@@ -35,9 +35,9 @@ export default function Insights() {
         <Card title="Ward risk ranking">
           <div style={{ maxHeight: 380, overflowY: 'auto' }}>
             {hs.wards.map((w) => (
-              <div key={w.ward} style={{ padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
+              <div key={w.ward} style={{ padding: '8px 0', borderBottom: '1px solid #e9ecef' }}>
                 <div className="row-flex between"><b style={{ fontSize: 14 }}>{w.ward}</b><span className="small">{w.open} open · <span style={{ color: '#dc2626' }}>{w.critical} urgent</span></span></div>
-                <Bar value={w.open} max={maxOpen} color={w.critical / w.open > 0.4 ? '#dc2626' : '#f97316'} />
+                <Bar value={w.open} max={maxOpen} color={w.critical / w.open > 0.4 ? '#dc2626' : '#ea580c'} />
                 <div className="small muted" style={{ marginTop: 3 }}>Top issue: {w.top_category}</div>
               </div>
             ))}
@@ -53,7 +53,7 @@ export default function Insights() {
                 {an.departments.map((d) => (
                   <tr key={d.department}>
                     <td style={{ fontWeight: 500 }}>{d.department}</td><td>{d.total}</td><td>{d.open}</td><td>{fmtHours(d.avg_hours)}</td>
-                    <td><div className="row-flex" style={{ flexWrap: 'nowrap' }}><div style={{ flex: 1 }}><Bar value={d.sla_compliance} color={d.sla_compliance < 70 ? '#dc2626' : d.sla_compliance < 85 ? '#f59e0b' : '#16a34a'} /></div><b className="small">{d.sla_compliance}%</b></div></td>
+                    <td><div className="row-flex" style={{ flexWrap: 'nowrap' }}><div style={{ flex: 1 }}><Bar value={d.sla_compliance} color={d.sla_compliance < 70 ? '#dc2626' : d.sla_compliance < 85 ? '#d97706' : '#16a34a'} /></div><b className="small">{d.sla_compliance}%</b></div></td>
                   </tr>
                 ))}
               </tbody>
@@ -75,11 +75,11 @@ export default function Insights() {
       <Card title="Grievance volume by ward">
         <ResponsiveContainer width="100%" height={240}>
           <BarChart data={an.by_ward}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#e9ecef" vertical={false} />
             <XAxis dataKey="name" tick={{ fontSize: 11 }} />
             <YAxis tick={{ fontSize: 11 }} width={30} />
             <Tooltip />
-            <RBar dataKey="value" name="Grievances" fill="#f97316" radius={[6, 6, 0, 0]} />
+            <RBar dataKey="value" name="Grievances" fill="#2563eb" radius={[2, 2, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </Card>

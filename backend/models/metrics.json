@@ -1,6 +1,6 @@
 {
-  "train_size": 1584,
-  "test_size": 396,
+  "train_size": 4928,
+  "test_size": 1232,
   "classes": [
     "Drainage & Sewage",
     "Electricity",
@@ -14,96 +14,204 @@
     "Tree & Parks",
     "Water Supply"
   ],
-  "test_accuracy": 1.0,
-  "test_macro_f1": 1.0,
-  "holdout_accuracy": 0.9545,
-  "holdout_size": 22,
+  "embeddings": true,
+  "embed_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+  "test_accuracy": 0.9951,
+  "test_macro_f1": 0.9951,
+  "holdout_accuracy": 0.8788,
+  "holdout_size": 66,
+  "holdout_auto_routed": 55,
+  "holdout_auto_routed_wrong": 4,
   "holdout_errors": [
     {
-      "text": "The tap water smells like sewage and my kids fell ill",
-      "true": "Water Supply",
-      "pred": "Drainage & Sewage"
+      "text": "A manhole-sized pit has opened up on the carriageway and two cars were damaged",
+      "true": "Roads & Potholes",
+      "pred": "Drainage & Sewage",
+      "confidence": 0.326
+    },
+    {
+      "text": "Hamari gali ka road aaj tak nahi bana, barish mein keechad ho jata hai",
+      "true": "Roads & Potholes",
+      "pred": "Drainage & Sewage",
+      "confidence": 0.17
+    },
+    {
+      "text": "Supply has been failing every afternoon for a week and the helpline does not answer",
+      "true": "Electricity",
+      "pred": "Water Supply",
+      "confidence": 0.542
+    },
+    {
+      "text": "The linesman demanded money to restore our connection",
+      "true": "Electricity",
+      "pred": "Safety & Law",
+      "confidence": 0.249
+    },
+    {
+      "text": "Meter tez chal raha hai, har mahine bill double aa raha hai",
+      "true": "Electricity",
+      "pred": "Water Supply",
+      "confidence": 0.469
+    },
+    {
+      "text": "Plastic bags and food leftovers are strewn across the playground after the weekly market",
+      "true": "Garbage & Sanitation",
+      "pred": "Encroachment",
+      "confidence": 0.337
+    },
+    {
+      "text": "The butcher throws waste in the open and the shop has no licence or hygiene",
+      "true": "Public Health",
+      "pred": "Garbage & Sanitation",
+      "confidence": 0.767
+    },
+    {
+      "text": "Trees along the avenue are being felled illegally for a hoarding",
+      "true": "Tree & Parks",
+      "pred": "Encroachment",
+      "confidence": 0.519
     }
   ],
+  "holdout_accuracy_tfidf_only": 0.803,
+  "dev_accuracy": 0.9835,
+  "dev_size": 121,
+  "languages": {
+    "Hindi": {
+      "size": 33,
+      "accuracy": 1.0,
+      "auto_routed": 32,
+      "auto_routed_wrong": 0,
+      "errors": []
+    },
+    "Marathi": {
+      "size": 33,
+      "accuracy": 0.9697,
+      "auto_routed": 33,
+      "auto_routed_wrong": 1,
+      "errors": [
+        {
+          "text": "वादळात मोठे झाड रस्त्यावर पडले असून रस्ता बंद आहे",
+          "true": "Tree & Parks",
+          "pred": "Roads & Potholes",
+          "confidence": 0.417
+        }
+      ]
+    }
+  },
   "report": {
     "Drainage & Sewage": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 36.0
+      "precision": 0.9910714285714286,
+      "recall": 0.9910714285714286,
+      "f1-score": 0.9910714285714286,
+      "support": 112.0
     },
     "Electricity": {
       "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 36.0
+      "recall": 0.9910714285714286,
+      "f1-score": 0.9955156950672646,
+      "support": 112.0
     },
     "Encroachment": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 36.0
+      "support": 112.0
     },
     "Garbage & Sanitation": {
       "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 36.0
+      "recall": 0.9910714285714286,
+      "f1-score": 0.9955156950672646,
+      "support": 112.0
     },
     "Public Health": {
-      "precision": 1.0,
+      "precision": 0.9911504424778761,
       "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 36.0
+      "f1-score": 0.9955555555555555,
+      "support": 112.0
     },
     "Public Transport": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 36.0
+      "support": 112.0
     },
     "Roads & Potholes": {
-      "precision": 1.0,
+      "precision": 0.9911504424778761,
       "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 36.0
+      "f1-score": 0.9955555555555555,
+      "support": 112.0
     },
     "Safety & Law": {
-      "precision": 1.0,
+      "precision": 0.9911504424778761,
       "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 36.0
+      "f1-score": 0.9955555555555555,
+      "support": 112.0
     },
     "Street Lights": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 36.0
+      "precision": 0.9910714285714286,
+      "recall": 0.9910714285714286,
+      "f1-score": 0.9910714285714286,
+      "support": 112.0
     },
     "Tree & Parks": {
-      "precision": 1.0,
+      "precision": 0.9911504424778761,
       "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 36.0
+      "f1-score": 0.9955555555555555,
+      "support": 112.0
     },
     "Water Supply": {
       "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 36.0
+      "recall": 0.9821428571428571,
+      "f1-score": 0.990990990990991,
+      "support": 112.0
     },
-    "accuracy": 1.0,
+    "accuracy": 0.9951298701298701,
     "macro avg": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 396.0
+      "precision": 0.9951586024594874,
+      "recall": 0.9951298701298701,
+      "f1-score": 0.9951261327718726,
+      "support": 1232.0
     },
     "weighted avg": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 396.0
+      "precision": 0.9951586024594874,
+      "recall": 0.9951298701298701,
+      "f1-score": 0.9951261327718726,
+      "support": 1232.0
     }
-  }
+  },
+  "zero_shot": {
+    "Hindi": {
+      "size": 33,
+      "accuracy": 0.9091,
+      "auto_routed": 31,
+      "auto_routed_wrong": 1
+    },
+    "Marathi": {
+      "size": 33,
+      "accuracy": 0.8485,
+      "auto_routed": 31,
+      "auto_routed_wrong": 4
+    }
+  },
+  "probe": {
+    "Gujarati": {
+      "size": 11,
+      "accuracy": 0.9091,
+      "auto_routed": 11,
+      "auto_routed_wrong": 1
+    },
+    "Bengali": {
+      "size": 11,
+      "accuracy": 0.8182,
+      "auto_routed": 8,
+      "auto_routed_wrong": 1
+    },
+    "Tamil": {
+      "size": 11,
+      "accuracy": 0.8182,
+      "auto_routed": 9,
+      "auto_routed_wrong": 2
+    }
+  },
+  "verified_rows": 0
 }

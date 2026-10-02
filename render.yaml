@@ -5,6 +5,16 @@ services:
     dockerfilePath: ./Dockerfile
     plan: free
     envVars:
+      - key: OFFICER_USER
+        value: officer
+      - key: OFFICER_PASSWORD
+        sync: false
+      - key: SAMAJSEVAK_SECRET
+        generateValue: true
+      # the free plan has 512 MB RAM; the embedding model needs about that much on its own.
+      # Set to "1" on a plan with 1 GB or more.
+      - key: SAMAJSEVAK_EMBEDDINGS
+        value: "0"
       - key: GEMINI_API_KEY
         sync: false
       - key: OPENAI_API_KEY

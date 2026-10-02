@@ -1,0 +1,9 @@
+.git
+backend/.venv
+backend/data
+backend/.pytest_cache
+backend/models/embedding_cache.npz
+frontend/dist
+**/node_modules
+**/__pycache__
+backend/models/fastembed_cache
