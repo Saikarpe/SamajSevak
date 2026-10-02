@@ -1,10 +1,18 @@
+# Render Blueprint: native Python runtime, no Docker.
+# The build installs the backend, then builds the React app that FastAPI serves.
 services:
   - type: web
     name: samajsevak
-    runtime: docker
-    dockerfilePath: ./Dockerfile
+    runtime: python
     plan: free
+    buildCommand: pip install -r backend/requirements.txt && cd frontend && npm ci && npm run build
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: NODE_VERSION
+        value: 22.20.0
       - key: OFFICER_USER
         value: officer
       - key: OFFICER_PASSWORD
@@ -21,4 +29,3 @@ services:
         sync: false
       - key: OPENAI_MODEL
         value: gpt-4o-mini
-    healthCheckPath: /api/health
