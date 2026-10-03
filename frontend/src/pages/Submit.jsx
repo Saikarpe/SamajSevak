@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CircleMarker, MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet'
-import { Camera, CheckCircle2, LocateFixed, MapPin, Mic, Send, Sparkles, Users, X } from 'lucide-react'
+import { Camera, CheckCircle2, ImageIcon, LocateFixed, MapPin, Mic, Send, Sparkles, Users, X } from 'lucide-react'
 import { api, citizen, fmtDistance, shrinkPhoto } from '../api'
 import AnalysisPanel from '../components/AnalysisPanel'
+import LiveCamera, { liveCameraAvailable } from '../components/LiveCamera'
 import { useCitizen } from '../components/Citizen'
 import { Card, StatusBadge } from '../components/ui'
 import { LANGS, LangSwitch, useLang } from '../i18n'
@@ -35,6 +36,11 @@ export default function Submit({ meta }) {
   const [point, setPoint] = useState(null) // { lat, lng, geo_source: 'gps' | 'pin' }
   const [locating, setLocating] = useState(false)
   const [photo, setPhoto] = useState(null)
+  const [live, setLive] = useState(false) // photo came from the camera, not the gallery
+  const [camera, setCamera] = useState(false) // live viewfinder open
+  const [picker, setPicker] = useState(false) // 'Add a photo' choice: camera or gallery
+  const gallery = useRef(null)
+  const nativeCam = useRef(null) // phone's own camera app: used when the browser blocks the live camera (plain http)
   const [analysis, setAnalysis] = useState(null)
   const [joinId, setJoinId] = useState(null) // existing issue the citizen chose to join
   const [loading, setLoading] = useState(false)
@@ -98,9 +104,11 @@ export default function Submit({ meta }) {
   const pickPhoto = async (e) => {
     const file = e.target.files[0]
     e.target.value = ''
-    if (file) try { setPhoto(await shrinkPhoto(file)) } catch { setErr('Could not read this image.') }
+    if (file) try { setPhoto(await shrinkPhoto(file)); setLive(e.target === nativeCam.current) } catch { setErr('Could not read this image.') }
   }
-  const reset = () => { setCreated(null); setPhoto(null); setPoint(null); setJoinId(null); setForm({ ...form, text: '' }) }
+  // 'Open camera': the live viewfinder where the browser allows it, otherwise the phone's camera app (same tap)
+  const openCamera = () => { setPicker(false); if (liveCameraAvailable()) setCamera(true); else nativeCam.current?.click() }
+  const reset = () => { setCreated(null); setPhoto(null); setLive(false); setPoint(null); setJoinId(null); setForm({ ...form, text: '' }) }
   const center = point ? [point.lat, point.lng] : meta?.ward_centers?.[form.ward] || PUNE
 
   if (created) return (
@@ -140,10 +148,10 @@ export default function Submit({ meta }) {
           <div className="field">
             <label>{t.photo}</label>
             <div className="row-flex">
-              <label className="btn" style={{ cursor: 'pointer' }}><Camera size={15} />{t.addPhoto}
-                <input type="file" accept="image/*" hidden onChange={pickPhoto} />
-              </label>
-              {photo && <><img src={photo} alt="" className="thumb" /><button className="btn" type="button" onClick={() => setPhoto(null)}><X size={14} />{t.remove}</button></>}
+              <button className="btn" type="button" onClick={() => setPicker(true)}><Camera size={15} />{t.addPhoto}</button>
+              <input ref={gallery} type="file" accept="image/*" hidden onChange={pickPhoto} />
+              <input ref={nativeCam} type="file" accept="image/*" capture="environment" hidden onChange={pickPhoto} />
+              {photo && <><img src={photo} alt="" className="thumb" />{live && <span className="chip" style={{ background: '#e7f6ec', color: '#16a34a' }}>{t.livePhoto}</span>}<button className="btn" type="button" onClick={() => { setPhoto(null); setLive(false) }}><X size={14} />{t.remove}</button></>}
               {!photo && <span className="small muted">{t.photoHint}</span>}
             </div>
           </div>
@@ -203,6 +211,22 @@ export default function Submit({ meta }) {
             )}
             <span className="small muted">{t.accountHint}</span>
           </div>
+          {picker && (
+            <div className="sheet-backdrop" onClick={() => setPicker(false)}>
+              <div className="sheet" onClick={(e) => e.stopPropagation()}>
+                <b className="sheet-title">{t.addPhoto}</b>
+                <button type="button" className="sheet-option" onClick={openCamera}><Camera size={20} />{t.openCamera}</button>
+                <button type="button" className="sheet-option" onClick={() => { setPicker(false); gallery.current?.click() }}><ImageIcon size={20} />{t.fromGallery}</button>
+                <button type="button" className="sheet-option cancel" onClick={() => setPicker(false)}>{t.cancel}</button>
+              </div>
+            </div>
+          )}
+          {camera && (
+            <LiveCamera t={t} point={point}
+              onCapture={(p) => { setPhoto(p); setLive(true); setCamera(false) }}
+              onClose={() => setCamera(false)}
+              onFallback={() => { setCamera(false); nativeCam.current?.click() }} />
+          )}
           {err && <p className="small" style={{ color: '#dc2626' }}>{err}</p>}
           <button className="btn saffron" style={{ width: '100%', justifyContent: 'center', padding: 12 }} disabled={form.text.trim().length < 10 || loading} onClick={submit}>
             <Send size={16} /> {joining ? `${t.join} ${joining.id}` : t.submit}
