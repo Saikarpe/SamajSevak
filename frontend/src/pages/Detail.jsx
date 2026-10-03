@@ -1,12 +1,21 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Bot, Camera, CheckCircle2, ClipboardCopy, Flag, Layers, Loader2, MapPin, Play, Tags, UserCheck, Users, X } from 'lucide-react'
+import { ArrowLeft, Bot, Camera, CheckCircle2, ClipboardCopy, Flag, Layers, Loader2, MapPin, MessageSquareWarning, Play, Tags, UserCheck, Users, X } from 'lucide-react'
 import { api, fmtHours, isOpen, shrinkPhoto, STAGE_COLORS, STATUS_COLORS } from '../api'
 import AnalysisPanel from '../components/AnalysisPanel'
 import { Card, PriorityBadge, StageBadge, StageLadder, StatusBadge } from '../components/ui'
 
 const GEO = { gps: 'GPS fix from the citizen’s phone', pin: 'Pin placed on the map by the citizen', seed: 'GPS fix (simulated seed data)', ward: 'Ward centre only — no GPS shared' }
 const SOURCE = { CITIZEN: 'joined by the citizen', AI: 'matched by AI', OFFICER: 'linked by an officer' }
+
+const GROUND = { yes: ['Work is happening', '#16a34a'], partly: ['Partly', '#d97706'], no: ['No work on the ground', '#dc2626'] }
+
+// a citizen's photo from the ground, fetched with the officer token like the evidence photo
+function GroundPhoto({ id, fid }) {
+  const [src, setSrc] = useState(null)
+  return src ? <img className="evidence" alt="" src={src} style={{ marginTop: 6 }} />
+    : <button className="link small" onClick={() => api.groundPhoto(id, fid).then(setSrc).catch(() => {})}><Camera size={12} /> View photo</button>
+}
 
 function Evidence({ id }) {
   const [src, setSrc] = useState(null)
@@ -116,6 +125,18 @@ export default function Detail({ meta }) {
               {!open && <><dt>Clock</dt><dd className="small">{g.status === 'Resolved' ? 'Paused: awaiting citizen confirmation. “Not satisfied” restarts it.' : 'Stopped'}</dd></>}
             </dl>
           </Card>
+          {g.ground_reports?.length > 0 && (
+            <Card title={<><MessageSquareWarning size={18} color="#dc2626" /> Citizen ground reports</>} sub="is work happening at each stage?">
+              {g.ground_reports.slice().reverse().map((r) => (
+                <div key={r.id} className="report">
+                  <div className="row-flex between"><StageBadge stage={r.stage} /><b className="small" style={{ color: GROUND[r.answer][1] }}>{GROUND[r.answer][0]}</b></div>
+                  {r.comment && <div style={{ marginTop: 4 }}>“{r.comment}”</div>}
+                  <div className="small muted">{r.grievance_id} · {new Date(r.created_at).toLocaleString()}{r.stage === g.stage && open && r.answer === 'no' && ' · flagged to the next authority'}</div>
+                  {r.photo ? <GroundPhoto id={g.id} fid={r.id} /> : null}
+                </div>
+              ))}
+            </Card>
+          )}
           <Card title="Officer actions">
             {err && <p className="small" style={{ color: '#dc2626', marginTop: 0 }}>{err}</p>}
             <dl className="kv" style={{ marginBottom: 12 }}>

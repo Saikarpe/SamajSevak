@@ -1,12 +1,97 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Camera, Search, ThumbsDown, ThumbsUp, Users } from 'lucide-react'
-import { api, API_BASE, fmtHours, STAGE_COLORS, STATUS_COLORS } from '../api'
+import { Camera, CheckCircle2, CircleDashed, Clock, Search, Send, ThumbsDown, ThumbsUp, Users, XCircle } from 'lucide-react'
+import { api, API_BASE, fmtHours, shrinkPhoto, STAGE_COLORS, STATUS_COLORS } from '../api'
 import { CitizenLogin, useCitizen } from '../components/Citizen'
 import { Card, PriorityBadge, StageBadge, StageLadder, StatusBadge } from '../components/ui'
 import { LangSwitch, useLang } from '../i18n'
 
 const FLOW = ['Submitted', 'Assigned', 'In Progress', 'Resolved', 'Closed']
+const OUTCOME = {
+  done: ['#16a34a', CheckCircle2], awaiting: ['#0d9488', CheckCircle2], not_done: ['#dc2626', XCircle],
+  in_progress: ['#0284c7', Clock], rejected: ['#8a949e', XCircle], not_reached: ['#9aa5b1', CircleDashed],
+}
+const GROUND_COLORS = { yes: '#16a34a', partly: '#d97706', no: '#dc2626' }
+
+// "Is work happening on the ground?" for the stage the issue is at now
+function GroundAsk({ g, t, onSent }) {
+  const [answer, setAnswer] = useState('')
+  const [comment, setComment] = useState('')
+  const [photo, setPhoto] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const pick = async (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) try { setPhoto(await shrinkPhoto(f)) } catch { setErr('Could not read this image.') } }
+  const send = () => {
+    setBusy(true); setErr('')
+    api.ground(g.id, { answer, comment: comment || null, photo }).then((d) => { setAnswer(''); setComment(''); setPhoto(null); onSent(d) })
+      .catch((x) => setErr(x.message)).finally(() => setBusy(false))
+  }
+  return (
+    <div className="ground-ask">
+      <b className="small">{t.groundQ}</b>
+      <div className="row-flex" style={{ marginTop: 6 }}>
+        {['yes', 'partly', 'no'].map((a) => (
+          <button key={a} type="button" className={`btn ${answer === a ? 'on' : ''}`} style={{ '--c': GROUND_COLORS[a] }} onClick={() => setAnswer(a)}>{t.ground[a]}</button>
+        ))}
+      </div>
+      {answer && (
+        <>
+          <input className="input" style={{ margin: '8px 0' }} placeholder={t.groundPh} value={comment} onChange={(e) => setComment(e.target.value)} maxLength={500} />
+          <div className="row-flex">
+            <label className="btn" style={{ cursor: 'pointer' }}><Camera size={15} />{t.addPhoto}<input type="file" accept="image/*" hidden onChange={pick} /></label>
+            {photo && <img src={photo} alt="" className="thumb" />}
+            <button type="button" className="btn primary" disabled={busy} onClick={send}><Send size={15} /> {t.send}</button>
+          </div>
+          {answer === 'no' && <p className="small muted" style={{ marginBottom: 0 }}>{t.groundNoFlag}</p>}
+        </>
+      )}
+      {err && <p className="small" style={{ color: '#dc2626', marginBottom: 0 }}>{err}</p>}
+    </div>
+  )
+}
+
+// one card per escalation stage: who held it, how long, what officers did, done or not, and the citizen's view
+function StageReports({ g, t, me, onSent }) {
+  const [sent, setSent] = useState(false)
+  return (
+    <Card title={t.stageReports}>
+      <p className="small muted" style={{ marginTop: 0 }}>{t.stageReportsHint}</p>
+      {g.stage_reports.map((c) => {
+        const [color, Icon] = OUTCOME[c.outcome]
+        const others = Object.entries(c.ground || {}).filter(([, n]) => n > 0)
+        return (
+          <div key={c.stage} className={`stage-report ${c.outcome}`} style={{ '--c': c.outcome === 'not_reached' ? '#d5dbe3' : STAGE_COLORS[c.stage] }}>
+            <div className="row-flex between">
+              <StageBadge stage={c.stage} label={t.stageName[c.stage]} />
+              <span className="small" style={{ color, fontWeight: 600 }}><Icon size={14} style={{ verticalAlign: -2 }} /> {t.outcome[c.outcome]}</span>
+            </div>
+            <div className="small" style={{ marginTop: 6 }}><span className="muted">{t.heldBy}:</span> {c.holder}</div>
+            {c.outcome !== 'not_reached' && (
+              <>
+                <div className="small muted">
+                  {new Date(c.start).toLocaleString()}{c.end && ` → ${new Date(c.end).toLocaleString()}`} · {t.took}: {fmtHours(c.hours)}
+                  {c.due && <> · {t.dueBy}: {new Date(c.due).toLocaleString()}</>}
+                </div>
+                <div className="small" style={{ marginTop: 4 }}>
+                  <span className="muted">{t.officerActions}:</span> {c.actions ? <>{c.actions} · “{c.last_action}”</> : <span className="muted">{t.noActions}</span>}
+                </div>
+                {others.length > 0 && (
+                  <div className="small" style={{ marginTop: 4 }}><span className="muted">{t.othersGround}:</span> {others.map(([a, n]) => <b key={a} style={{ color: GROUND_COLORS[a], marginRight: 8 }}>{n} {t.ground[a]}</b>)}</div>
+                )}
+                {c.mine && <div className="small" style={{ marginTop: 4 }}><span className="muted">{t.yourGround}:</span> <b style={{ color: GROUND_COLORS[c.mine.answer] }}>{t.ground[c.mine.answer]}</b>{c.mine.comment && ` · “${c.mine.comment}”`}</div>}
+                {c.outcome === 'in_progress' && g.can_report_ground && (
+                  g.has_account && !me
+                    ? <div style={{ marginTop: 8 }}><p className="small" style={{ margin: '0 0 6px' }}>{t.needLogin}</p><CitizenLogin t={t} me={me} /></div>
+                    : <><GroundAsk g={g} t={t} onSent={(d) => { setSent(true); onSent(d) }} />{sent && <p className="small" style={{ color: '#16a34a', marginBottom: 0 }}>{t.groundThanks}</p>}</>
+                )}
+              </>
+            )}
+          </div>
+        )
+      })}
+    </Card>
+  )
+}
 
 export default function Track() {
   const { id } = useParams()
@@ -70,6 +155,7 @@ export default function Track() {
               {g.stage_due && !['Resolved', 'Closed', 'Rejected'].includes(g.status) && <span className="small muted"> · {new Date(g.stage_due).toLocaleString()}</span>}
             </p>
           </Card>
+          {g.stage_reports && <StageReports g={g} t={t} me={me} onSent={setG} />}
           {g.resolution_photo && (
             <Card title={t.proof}><img className="evidence" alt="" src={`${API_BASE}/api/track/${encodeURIComponent(g.id)}/resolution-photo`} /></Card>
           )}

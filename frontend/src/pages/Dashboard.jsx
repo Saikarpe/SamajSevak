@@ -37,6 +37,7 @@ export default function Dashboard() {
           ))}
           <button onClick={() => nav('/grievances?status=Not Satisfied')} style={{ borderTopColor: '#dc2626' }}><b>{s.not_satisfied}</b><span>Citizen not satisfied</span></button>
           <button onClick={() => nav('/grievances')} style={{ borderTopColor: '#2563eb' }}><b>{s.multi_report_issues}</b><span>Issues with several reports ({s.linked_reports} linked)</span></button>
+          <button onClick={() => nav('/grievances?no_work=true')} style={{ borderTopColor: '#dc2626' }}><b>{s.no_work_reported}</b><span>Citizens report no work</span></button>
           <button onClick={() => nav('/grievances?flagged=true')} style={{ borderTopColor: '#8a949e' }}><b>{s.abuse_review}</b><span>Reports flagged for review</span></button>
         </div>
         <p className="small muted" style={{ marginBottom: 0 }}>Complaint and Warning stay with the department. Strike 1 goes to its higher authority, Strike 2 to the Deputy Collector, Strike 3 to the final escalation body. {s.duplicate_candidates} open issue(s) have a possible duplicate for an officer to check; {s.rejected} rejected.</p>

@@ -89,6 +89,12 @@ class FeedbackIn(BaseModel):
     comment: Optional[str] = Field(None, max_length=500)
 
 
+class GroundIn(BaseModel):
+    answer: Literal["yes", "partly", "no"]  # is work happening on the ground at this stage?
+    comment: Optional[str] = Field(None, max_length=500)
+    photo: Optional[str] = Field(None, max_length=4_200_000)
+
+
 class LoginIn(BaseModel):
     username: str = Field(max_length=64)
     password: str = Field(max_length=256)
@@ -211,6 +217,21 @@ def rate(gid: str, body: FeedbackIn, citizen: Optional[dict] = Citizen):
     return services.track(services.feedback(gid, body.rating, body.satisfied, body.comment)["id"])
 
 
+@app.post("/api/grievances/{gid}/ground")
+def ground(gid: str, body: GroundIn, citizen: Optional[dict] = Citizen):
+    """At any open stage the citizen says whether work is happening on the ground."""
+    g = services.get_grievance(gid)
+    if not g:
+        raise HTTPException(404, "Grievance not found")
+    if g["citizen_id"] and (not citizen or citizen["c"] != g["citizen_id"]):
+        raise HTTPException(403, "Sign in as the citizen who filed this report to respond")
+    try:
+        services.ground_report(gid, body.answer, (body.comment or "").strip() or None, _photo(body.photo))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return services.track(gid)
+
+
 @app.get("/api/public/stats")
 def public_stats():
     """Aggregate operational counts only."""
@@ -221,9 +242,10 @@ def public_stats():
 # ---------------- officer console (login required) ----------------
 @app.get("/api/grievances")
 def list_(status: str = None, category: str = None, priority: str = None, ward: str = None, q: str = None,
-          limit: int = 200, stage: str = None, flagged: bool = False, department: str = None, officer: dict = Officer):
+          limit: int = 200, stage: str = None, flagged: bool = False, department: str = None, no_work: bool = False,
+          officer: dict = Officer):
     services.tick()
-    return services.list_grievances(status, category, priority, ward, q, limit, stage, flagged, department, auth.scope(officer))
+    return services.list_grievances(status, category, priority, ward, q, limit, stage, flagged, department, auth.scope(officer), no_work)
 
 
 @app.get("/api/grievances/{gid}")
@@ -244,6 +266,15 @@ def get(gid: str, officer: dict = Officer):
 def photo(gid: str, officer: dict = Officer):
     _visible(gid, officer)
     f = services.photo_file(gid)
+    if not f:
+        raise HTTPException(404, "No photo attached")
+    return FileResponse(f[0], media_type=f[1], headers={"X-Content-Type-Options": "nosniff"})
+
+
+@app.get("/api/grievances/{gid}/ground/{fid}/photo")
+def ground_photo(gid: str, fid: int, officer: dict = Officer):
+    g = _visible(gid, officer)
+    f = services.ground_photo_file(g["master_id"], fid)
     if not f:
         raise HTTPException(404, "No photo attached")
     return FileResponse(f[0], media_type=f[1], headers={"X-Content-Type-Options": "nosniff"})

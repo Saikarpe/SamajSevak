@@ -48,6 +48,8 @@ export const api = {
   photo: (id) => call(`/api/grievances/${encodeURIComponent(id)}/photo`).then((r) => r.blob()).then(URL.createObjectURL),
   update: (id, body) => req(`/api/grievances/${id}`, { method: 'PATCH', body }),
   feedback: (id, body) => req(`/api/grievances/${id}/feedback`, { method: 'POST', body }),
+  ground: (id, body) => req(`/api/grievances/${encodeURIComponent(id)}/ground`, { method: 'POST', body }),
+  groundPhoto: (id, fid) => call(`/api/grievances/${encodeURIComponent(id)}/ground/${fid}/photo`).then((r) => r.blob()).then(URL.createObjectURL),
   draft: (id) => req(`/api/grievances/${id}/draft`, { method: 'POST' }),
   model: () => req('/api/model'),
   retrain: () => req('/api/model/retrain', { method: 'POST' }),

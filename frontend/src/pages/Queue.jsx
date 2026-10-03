@@ -31,6 +31,7 @@ export default function Queue({ meta }) {
           {sel('category', 'All categories', Object.keys(meta?.categories || {}))}
           {sel('ward', 'All wards', meta?.wards || [])}
           {sel('stage', 'All stages', (meta?.stages || []).map((x) => x.stage).filter((s) => !head || ['Complaint', 'Warning'].includes(s)))}
+          {f.no_work && <button className="btn" onClick={() => { const p = new URLSearchParams(params); p.delete('no_work'); setParams(p) }}>Citizens report no work — clear</button>}
           {f.flagged && <button className="btn" onClick={() => { const p = new URLSearchParams(params); p.delete('flagged'); setParams(p) }}>Flagged for review — clear</button>}
           <span className="small muted">{rows ? `${rows.length} results` : 'Loading…'}</span>
         </div>
@@ -41,7 +42,7 @@ export default function Queue({ meta }) {
               {rows?.map((g) => (
                 <tr key={g.id} className="row" onClick={() => nav(`/grievances/${g.id}`)}>
                   <td className="mono">{g.id}</td>
-                  <td style={{ maxWidth: 340 }}><div style={{ fontWeight: 500 }}>{g.title}</div><div className="small muted">{g.category}{g.report_count > 1 && <b style={{ color: '#2563eb' }}> · {g.report_count} reports</b>}{g.duplicate_of && g.report_count === 1 && ' · possible duplicate'}{g.language && g.language !== 'English' && ` · ${g.language}`}{g.photo && ' · photo'}{g.any_abuse_review ? ' · review flag' : ''}</div></td>
+                  <td style={{ maxWidth: 340 }}><div style={{ fontWeight: 500 }}>{g.title}</div><div className="small muted">{g.category}{g.report_count > 1 && <b style={{ color: '#2563eb' }}> · {g.report_count} reports</b>}{g.duplicate_of && g.report_count === 1 && ' · possible duplicate'}{g.language && g.language !== 'English' && ` · ${g.language}`}{g.photo && ' · photo'}{g.any_abuse_review ? ' · review flag' : ''}{g.ground_no > 0 && <b style={{ color: '#dc2626' }}> · citizens: no work</b>}{!g.ground_no && g.ground_yes > 0 && <span style={{ color: '#16a34a' }}> · citizens: work seen</span>}</div></td>
                   <td>{g.ward}</td>
                   <td className="small">{g.department}</td>
                   <td><PriorityBadge level={g.priority_level} /><div className="small muted">{g.priority_score}</div></td>

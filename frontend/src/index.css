@@ -171,3 +171,10 @@ button.link:hover { text-decoration: underline; }
 .sheet-option:hover { background: var(--primary-soft); color: var(--primary); }
 .sheet-option.cancel { background: none; justify-content: center; color: var(--muted); font-weight: 500; }
 @media (min-width: 761px) { .sheet-backdrop { align-items: center; } .sheet { border-radius: 18px; } }
+
+/* stage reports on the tracking page */
+.stage-report { border-left: 4px solid var(--c); background: #f8fafc; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+.stage-report.not_reached { opacity: .6; }
+.stage-report.in_progress { background: var(--primary-soft); }
+.ground-ask { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.ground-ask .btn.on { background: var(--c); border-color: var(--c); color: #fff; }

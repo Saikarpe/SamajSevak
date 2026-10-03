@@ -314,6 +314,34 @@ def test_department_heads_see_only_their_issues_until_escalated(client, officer)
     assert client.get("/api/stats", headers=mine).json()["stages"].get("Strike 1", 0) == 0
 
 
+def test_stage_reports_and_ground_feedback(client, officer):
+    g = submit(client, "Huge pothole in the middle of the road near the old bridge, scooters are falling", lat=18.4710, lng=73.8650)
+    gid = g["id"]
+    cards = client.get(f"/api/track/{gid}").json()["stage_reports"]
+    assert [c["stage"] for c in cards] == services.STAGES
+    assert cards[0]["outcome"] == "in_progress" and cards[0]["due"] and {c["outcome"] for c in cards[1:]} == {"not_reached"}
+    # the citizen says nothing is happening: shown on their card, flagged to the next authority, visible to officers
+    t = client.post(f"/api/grievances/{gid}/ground", json={"answer": "no", "comment": "Nobody has come"}).json()
+    assert t["stage_reports"][0]["mine"]["answer"] == "no" and t["stage_reports"][0]["ground"]["no"] == 1
+    assert "Flagged to" in notes(t) and "Nobody has come" in notes(t)
+    assert case(client, officer, gid)["ground_reports"][0]["answer"] == "no"
+    assert gid in [r["id"] for r in client.get("/api/grievances?no_work=true&limit=500", headers=officer).json()]
+    assert client.get("/api/stats", headers=officer).json()["no_work_reported"] >= 1
+    # a new answer at the same stage replaces the old one
+    client.post(f"/api/grievances/{gid}/ground", json={"answer": "partly"})
+    assert [r["answer"] for r in case(client, officer, gid)["ground_reports"]] == ["partly"]
+    # not resolved in time: the Complaint card says "not done", the Warning card is now in progress
+    services.run_escalations(datetime.strptime(case(client, officer, gid)["stage_due"], services.FMT) + timedelta(seconds=1))
+    cards = client.get(f"/api/track/{gid}").json()["stage_reports"]
+    assert [c["outcome"] for c in cards[:3]] == ["not_done", "in_progress", "not_reached"] and cards[1]["mine"] is None
+    # resolved: the card shows it waits for the citizen, and ground reports close in favour of the confirmation
+    client.patch(f"/api/grievances/{gid}", json={"status": "Resolved", "note": "Pothole filled"}, headers=officer)
+    t = client.get(f"/api/track/{gid}").json()
+    assert t["stage_reports"][1]["outcome"] == "awaiting" and not t["can_report_ground"]
+    assert client.post(f"/api/grievances/{gid}/ground", json={"answer": "yes"}).status_code == 400
+    assert client.post(f"/api/grievances/{gid}/ground", json={"answer": "maybe"}).status_code == 422
+
+
 def test_resolved_issues_do_not_escalate_and_rejection_keeps_the_record(client, officer):
     g = submit(client, "Bus stop shelter is broken near the stadium and people wait in the rain", lat=18.5200, lng=73.8200)
     client.patch(f"/api/grievances/{g['id']}", json={"status": "Resolved", "note": "Shelter repaired"}, headers=officer)

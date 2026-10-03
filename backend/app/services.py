@@ -387,6 +387,7 @@ def get_grievance(gid):
             "satisfaction, feedback_rating, feedback_text, photo IS NOT NULL AS photo, geo_source, lat, lng, abuse_review "
             "FROM grievances WHERE master_id=? ORDER BY created_at, id", (master,))]
         g["report_count"] = len(g["reports"])
+        g["ground_reports"] = _ground_rows(c, master)
     return _flags(g)
 
 
@@ -399,7 +400,9 @@ def track(gid):
     """Public status view for a tracking ID."""
     g = get_grievance(gid)
     return g and {**{k: g[k] for k in TRACK_FIELDS}, "sla_hours": CATEGORIES[g["category"]]["sla_hours"],
-                  "stages": STAGES, "has_account": bool(g["citizen_id"])}
+                  "stages": STAGES, "has_account": bool(g["citizen_id"]),
+                  "stage_reports": stage_reports(g["master_id"], own_id=g["id"]),
+                  "can_report_ground": g["status"] not in CLOSED and g["status"] != "Resolved"}
 
 
 def _breached(g):
@@ -416,10 +419,12 @@ def visible(g, scope):
 
 
 def list_grievances(status=None, category=None, priority=None, ward=None, q=None, limit=200, stage=None, flagged=None,
-                    department=None, scope=None):
+                    department=None, scope=None, no_work=None):
     """The officer queue: one row per master issue, however many citizens reported it."""
     sql = ("SELECT g.*, (SELECT COUNT(*) FROM grievances r WHERE r.master_id=g.id) AS report_count, "
-           "(SELECT MAX(r.abuse_review) FROM grievances r WHERE r.master_id=g.id) AS any_abuse_review "
+           "(SELECT MAX(r.abuse_review) FROM grievances r WHERE r.master_id=g.id) AS any_abuse_review, "
+           "(SELECT COUNT(*) FROM ground_reports x WHERE x.master_id=g.id AND x.stage=g.stage AND x.answer='no') AS ground_no, "
+           "(SELECT COUNT(*) FROM ground_reports x WHERE x.master_id=g.id AND x.stage=g.stage AND x.answer<>'no') AS ground_yes "
            "FROM grievances g WHERE g.master_id=g.id")
     args = []
     for col, val in (("status", status), ("category", category), ("priority_level", priority), ("ward", ward), ("stage", stage),
@@ -432,6 +437,9 @@ def list_grievances(status=None, category=None, priority=None, ward=None, q=None
         args += HELD
     if flagged:
         sql += " AND EXISTS (SELECT 1 FROM grievances r WHERE r.master_id=g.id AND r.abuse_review=1)"
+    if no_work:  # open issues where a citizen says nothing is happening at the current stage
+        sql += (" AND g.status NOT IN ('Resolved','Closed','Rejected') AND EXISTS "
+                "(SELECT 1 FROM ground_reports x WHERE x.master_id=g.id AND x.stage=g.stage AND x.answer='no')")
     if q:  # a match in any linked report finds its issue
         sql += " AND g.id IN (SELECT master_id FROM grievances WHERE text LIKE ? OR id LIKE ? OR title LIKE ?)"
         args += [f"%{q}%"] * 3
@@ -568,6 +576,85 @@ def feedback(gid, rating=None, satisfied=None, comment=None):
     return get_grievance(gid)
 
 
+# ---------------- ground reports: the citizen's view of the work at each stage ----------------
+GROUND = {"yes": "work is happening", "partly": "some work, not enough", "no": "no work on the ground"}
+
+
+def ground_report(gid, answer, comment=None, photo=None):
+    """The citizen answers "is work happening on the ground?" for the stage the issue is at now.
+    One answer per report and stage (a new answer replaces it). A "no" is flagged to the next authority."""
+    g = get_grievance(gid)
+    master, stage = g["master_id"], g["stage"] or STAGES[0]
+    i = STAGES.index(stage)
+    if g["status"] in CLOSED or g["status"] == "Resolved":
+        raise ValueError("This issue is resolved or closed: use the confirmation instead")
+    name = _save_photo(f"{gid}-ground-{i}", photo) if photo else None
+    nxt = authority(STAGES[i + 1], g["department"]) if i + 1 < len(STAGES) else None
+    note = f"Citizen ({gid}) at the {stage} stage: {GROUND[answer]}" + (f" \u2014 \u201c{comment}\u201d" if comment else "")
+    if answer == "no" and nxt:
+        note += f". Flagged to {nxt} ahead of the deadline"
+    note += " (photo attached)" if photo else ""
+    with db.conn() as c:
+        c.execute("DELETE FROM ground_reports WHERE grievance_id=? AND stage=?", (gid, stage))
+        c.execute("INSERT INTO ground_reports(grievance_id, master_id, stage, answer, comment, photo, created_at) VALUES (?,?,?,?,?,?,?)",
+                  (gid, master, stage, answer, comment, name, now().strftime(FMT)))
+        add_event(c, master, g["status"], note, "Citizen")
+        if master != gid:  # the citizen also sees it on their own report
+            add_event(c, gid, g["status"], note, "Citizen")
+    return get_grievance(gid)
+
+
+def _ground_rows(c, master):
+    return [dict(r) for r in c.execute(
+        "SELECT id, grievance_id, stage, answer, comment, photo IS NOT NULL AS photo, created_at FROM ground_reports "
+        "WHERE master_id=? ORDER BY created_at, id", (master,))]
+
+
+def ground_photo_file(gid, fid):
+    with db.conn() as c:
+        r = c.execute("SELECT photo FROM ground_reports WHERE id=? AND master_id=?", (fid, gid)).fetchone()
+    path = db.UPLOADS / r[0] if r and r[0] else None
+    return (path, PHOTO_TYPES[path.suffix[1:]]) if path and path.is_file() else None
+
+
+def stage_reports(master_id, own_id=None):
+    """One report card per escalation stage of the issue: who held it, for how long, what officers did,
+    and whether the work was done there (resolved) or not (escalated). Citizens see the counts of
+    everyone's ground reports but only their own wording (own_id)."""
+    m = get_grievance(master_id)
+    with db.conn() as c:
+        ground = _ground_rows(c, master_id)
+    moves = {e["new_state"]: e["ts"] for e in m["timeline"] if e["actor_type"] == "System" and e["new_state"] in STAGES}
+    at = STAGES.index(m["stage"] or STAGES[0])
+    cards, t = [], now().strftime(FMT)
+    for i, stage in enumerate(STAGES):
+        card = {"stage": stage, "holder": authority(stage, m["department"])}
+        if i > at:
+            cards.append({**card, "outcome": "not_reached"})
+            continue
+        start = m["created_at"] if i == 0 else moves.get(stage, m["created_at"])
+        end = moves.get(STAGES[i + 1]) if i < at else None
+        if end:
+            outcome = "not_done"
+        elif m["status"] == "Closed":
+            outcome, end = "done", m["resolved_at"]
+        elif m["status"] == "Resolved":
+            outcome, end = "awaiting", m["resolved_at"]
+        elif m["status"] == "Rejected":
+            outcome = "rejected"
+        else:
+            outcome = "in_progress"
+        actions = [e for e in m["timeline"] if e["actor_type"] == "Officer" and start <= e["ts"] <= (end or t)]
+        mine = [r for r in ground if r["stage"] == stage and r["grievance_id"] == own_id]
+        cards.append({**card, "outcome": outcome, "start": start, "end": end,
+                      "due": m["stage_due"] if outcome == "in_progress" else None,
+                      "hours": max(0.0, round((datetime.strptime(end or t, FMT) - datetime.strptime(start, FMT)).total_seconds() / 3600, 1)),
+                      "actions": len(actions), "last_action": actions[-1]["note"] if actions else None,
+                      "ground": {a: sum(1 for r in ground if r["stage"] == stage and r["answer"] == a) for a in GROUND},
+                      "mine": {k: mine[-1][k] for k in ("answer", "comment", "created_at")} if mine else None})
+    return cards
+
+
 # ---------------- escalation ----------------
 def run_escalations(at=None):
     """Move every unresolved master issue whose stage deadline has passed to the next stage.
@@ -658,7 +745,16 @@ def stats(scope=None):
         "linked_reports": sum(n - 1 for n in per_issue.values()),
         "duplicate_candidates": sum(1 for r in open_issues if r["duplicate_of"]),
         "abuse_review": sum(1 for r in rows if r["abuse_review"]),
+        "no_work_reported": _no_work_count({r["id"] for r in open_issues}),
     }
+
+
+def _no_work_count(ids):
+    """Open issues where a citizen reports no work at the issue's current stage."""
+    with db.conn() as c:
+        hit = {r[0] for r in c.execute("SELECT DISTINCT x.master_id FROM ground_reports x JOIN grievances g ON g.id=x.master_id "
+                                       "WHERE x.answer='no' AND x.stage=g.stage")}
+    return len(hit & ids)
 
 
 def public_stats():

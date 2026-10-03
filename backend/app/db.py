@@ -29,6 +29,11 @@ CREATE TABLE IF NOT EXISTS officers (
 CREATE TABLE IF NOT EXISTS citizens (
     id TEXT PRIMARY KEY, name TEXT, phone TEXT UNIQUE, created_at TEXT
 );
+-- the citizen's answer to "is work happening on the ground?" at an escalation stage (one per report and stage)
+CREATE TABLE IF NOT EXISTS ground_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, grievance_id TEXT, master_id TEXT, stage TEXT,
+    answer TEXT, comment TEXT, photo TEXT, created_at TEXT, UNIQUE(grievance_id, stage)
+);
 CREATE INDEX IF NOT EXISTS idx_g_status ON grievances(status);
 CREATE INDEX IF NOT EXISTS idx_g_created ON grievances(created_at);
 """
