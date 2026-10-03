@@ -17,6 +17,10 @@ services:
         value: officer
       - key: OFFICER_PASSWORD
         sync: false
+      # password of every department-head and strike-body login; without it (and with
+      # OFFICER_PASSWORD set) only the officer account exists
+      - key: STAFF_PASSWORD
+        sync: false
       - key: SAMAJSEVAK_SECRET
         generateValue: true
       # the free plan has 512 MB RAM; the embedding model needs about that much on its own.

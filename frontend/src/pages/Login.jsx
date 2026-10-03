@@ -22,7 +22,7 @@ export default function Login({ meta }) {
       <Card title={<><KeyRound size={18} color="#2563eb" /> Officer sign in</>}>
         <p className="small muted" style={{ marginTop: 0 }}>The officer console holds complaint evidence, photos and case decisions, so it needs a login. Citizens’ names and phone numbers are never shown in it. Citizens do not need an account to <Link to="/citizen" style={{ textDecoration: 'underline' }}>raise</Link> or <Link to="/track" style={{ textDecoration: 'underline' }}>track</Link> a grievance.</p>
         <form onSubmit={submit}>
-          <div className="field"><label>Username</label><input className="input" autoFocus autoComplete="username" value={form.username} onChange={set('username')} /></div>
+          <div className="field"><label>Username</label><input className="input" autoFocus autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={form.username} onChange={set('username')} /></div>
           <div className="field"><label>Password</label><input className="input" type="password" autoComplete="current-password" value={form.password} onChange={set('password')} /></div>
           {err && <p className="small" style={{ color: '#dc2626' }}>{err}</p>}
           <button className="btn primary" style={{ width: '100%', justifyContent: 'center' }} disabled={busy || !form.username || !form.password}><LogIn size={16} /> Sign in</button>
@@ -32,6 +32,24 @@ export default function Login({ meta }) {
             <b>Demo build</b>
             <p>No officer password is configured, so a demo account is active: <span className="mono">{demo.username}</span> / <span className="mono">{demo.password}</span>. Set <span className="mono">OFFICER_PASSWORD</span> on the server to remove it.</p>
             <button className="btn" type="button" style={{ marginTop: 8 }} onClick={() => setForm(demo)}>Fill demo credentials</button>
+          </div>
+        )}
+        {demo && meta?.demo_staff?.length > 0 && (
+          <div style={{ marginTop: 14 }}>
+            <b className="small">Department heads and strike bodies</b>
+            <p className="small muted" style={{ margin: '4px 0 8px' }}>Same demo password. A department head sees only its own department's issues at the Complaint and Warning stages; strike bodies see every department.</p>
+            <div className="table-wrap">
+              <table>
+                <tbody>
+                  {meta.demo_staff.map((a) => (
+                    <tr key={a.username} className="row" onClick={() => setForm({ username: a.username, password: demo.password })}>
+                      <td className="mono small">{a.username}</td>
+                      <td className="small">{a.role === 'department' ? a.department : a.name}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </Card>

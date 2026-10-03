@@ -52,6 +52,8 @@ MIGRATIONS = {"geo_source": "TEXT DEFAULT 'ward'", "language": "TEXT", "photo": 
               "photo_sha": "TEXT", "photo_phash": "TEXT", "ip_hash": "TEXT", "review_signals": "TEXT",
               "abuse_review": "INTEGER DEFAULT 0"}
 EVENT_MIGRATIONS = {"actor_type": "TEXT", "prev_state": "TEXT", "new_state": "TEXT"}
+# officer roles: admin (everything) | department (its own issues at Complaint / Warning) | strike (all departments)
+OFFICER_MIGRATIONS = {"role": "TEXT DEFAULT 'admin'", "department": "TEXT"}
 UPLOADS = DB_PATH.parent / "uploads"
 
 
@@ -70,7 +72,7 @@ def conn():
 def init():
     with conn() as c:
         c.executescript(SCHEMA)
-        for table, cols in (("grievances", MIGRATIONS), ("events", EVENT_MIGRATIONS)):
+        for table, cols in (("grievances", MIGRATIONS), ("events", EVENT_MIGRATIONS), ("officers", OFFICER_MIGRATIONS)):
             have = {r["name"] for r in c.execute(f"PRAGMA table_info({table})")}
             for col, ddl in cols.items():
                 if col not in have:

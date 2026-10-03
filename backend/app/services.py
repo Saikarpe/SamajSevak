@@ -20,6 +20,9 @@ STATUSES = ["Submitted", "Assigned", "In Progress", "Resolved", "Not Satisfied",
 DONE = ("Resolved", "Closed")
 CLOSED = DONE + ("Rejected",)
 STAGES = [s[0] for s in ESCALATION_STAGES]
+# stages where the issue is held by its own department (Complaint, Warning); the strikes go upward
+HELD = tuple(s[0] for s in ESCALATION_STAGES if s[1] == DEPARTMENT_LEVEL)
+DEPT_QUEUE_TARGET = 7  # demo seed: open issues each department head starts with
 FMT = "%Y-%m-%dT%H:%M:%S"
 PHOTO_TYPES = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
 MAX_PHOTO_BYTES = 3 * 1024 * 1024
@@ -43,8 +46,11 @@ def now():
 
 
 def _next_id(c) -> str:
-    n = c.execute("SELECT COUNT(*) FROM grievances").fetchone()[0] + 1
-    return f"SS-{now().year}-{n:05d}"
+    """Highest number used this year + 1 (not a row count, so a deleted row never causes a clash)."""
+    prefix = f"SS-{now().year}-"
+    last = c.execute("SELECT MAX(CAST(SUBSTR(id, ?) AS INTEGER)) FROM grievances WHERE id LIKE ?",
+                     (len(prefix) + 1, prefix + "%")).fetchone()[0]
+    return f"{prefix}{(last or 0) + 1:05d}"
 
 
 def refresh_index():
@@ -403,16 +409,27 @@ def _breached(g):
     return end > datetime.strptime(g["sla_due"], FMT)
 
 
-def list_grievances(status=None, category=None, priority=None, ward=None, q=None, limit=200, stage=None, flagged=None):
+def visible(g, scope):
+    """Can this officer see the issue? A department head (scope = its department) only sees its own
+    department's issues while they are at a department-level stage; strike bodies and admins see all."""
+    return bool(g) and (not scope or (g["department"] == scope and (g["stage"] or STAGES[0]) in HELD))
+
+
+def list_grievances(status=None, category=None, priority=None, ward=None, q=None, limit=200, stage=None, flagged=None,
+                    department=None, scope=None):
     """The officer queue: one row per master issue, however many citizens reported it."""
     sql = ("SELECT g.*, (SELECT COUNT(*) FROM grievances r WHERE r.master_id=g.id) AS report_count, "
            "(SELECT MAX(r.abuse_review) FROM grievances r WHERE r.master_id=g.id) AS any_abuse_review "
            "FROM grievances g WHERE g.master_id=g.id")
     args = []
-    for col, val in (("status", status), ("category", category), ("priority_level", priority), ("ward", ward), ("stage", stage)):
+    for col, val in (("status", status), ("category", category), ("priority_level", priority), ("ward", ward), ("stage", stage),
+                     ("department", scope or department)):
         if val:
             sql += f" AND g.{col}=?"
             args.append(val)
+    if scope:
+        sql += f" AND COALESCE(g.stage, '{STAGES[0]}') IN ({','.join('?' * len(HELD))})"
+        args += HELD
     if flagged:
         sql += " AND EXISTS (SELECT 1 FROM grievances r WHERE r.master_id=g.id AND r.abuse_review=1)"
     if q:  # a match in any linked report finds its issue
@@ -597,21 +614,23 @@ def purge_ip_hashes():
 
 
 # ---------------- analytics ----------------
-def _all():
+def _all(scope=None):
+    """Every report; for a department head only its department's issues at the department-level stages."""
     with db.conn() as c:
         rows = [dict(r) for r in c.execute(
             "SELECT id, created_at, ward, category, department, priority_level, priority_score, status, sla_due, resolved_at, "
             "resolution_hours, sentiment, feedback_rating, lat, lng, title, master_id, stage, satisfaction, abuse_review, "
             "duplicate_of FROM grievances")]
+    rows = [r for r in rows if visible(r, scope)]
     for r in rows:
         r["_created"] = datetime.strptime(r["created_at"], FMT)
         r["sla_breached"] = _breached(r)
     return rows
 
 
-def stats():
+def stats(scope=None):
     """Counts are citizen reports unless the name says 'issues' (master issues, the unit of work)."""
-    rows = _all()
+    rows = _all(scope)
     open_ = [r for r in rows if r["status"] not in CLOSED]
     resolved = [r for r in rows if r["status"] in DONE]
     ratings = [r["feedback_rating"] for r in rows if r["feedback_rating"]]
@@ -656,8 +675,8 @@ def public_stats():
             "avg_resolution_hours": s["avg_resolution_hours"], "by_department": table("department"), "by_ward": table("ward")}
 
 
-def analytics():
-    rows = _all()
+def analytics(scope=None):
+    rows = _all(scope)
     t = now()
     by_cat = Counter(r["category"] for r in rows)
     by_ward = Counter(r["ward"] for r in rows)
@@ -694,8 +713,8 @@ def analytics():
     }
 
 
-def hotspots():
-    rows = [r for r in _all() if r["status"] not in CLOSED]
+def hotspots(scope=None):
+    rows = [r for r in _all(scope) if r["status"] not in CLOSED]
     out = []
     for ward, (lat, lng) in WARDS.items():
         wr = [r for r in rows if r["ward"] == ward]
@@ -710,10 +729,10 @@ def hotspots():
     return {"wards": sorted(out, key=lambda x: -x["open"]), "points": points}
 
 
-def alerts():
+def alerts(scope=None):
     """Emerging-issue detection: compares last-7-day volume per (ward, category)
     against the trailing 3-week weekly baseline, plus SLA risk alerts."""
-    rows = _all()
+    rows = _all(scope)
     t = now()
     recent, base = Counter(), Counter()
     for r in rows:
@@ -801,4 +820,28 @@ def seed_if_empty():
                 add_event(c, g["id"], "In Progress", "Field team dispatched", "Field Officer", created + timedelta(hours=min(age_h, 3)))
                 _sync(c, g["id"])
     run_escalations()
+    _top_up_departments(rng, geo_rng, citizens)
+    run_escalations()
     refresh_index()
+
+
+def _top_up_departments(rng, geo_rng, citizens, target=DEPT_QUEUE_TARGET):
+    """Demo data: every department head's portal starts with `target` open issues at the Complaint /
+    Warning stage. Each one is a normal report filed some time within those two periods; a report the
+    AI routes elsewhere or joins to an existing issue simply stays as it is."""
+    from app.ml.dataset import complaint_text
+    held = ",".join("?" * len(HELD))
+    for cat, info in CATEGORIES.items():
+        for _ in range(4 * target):
+            with db.conn() as c:
+                n = c.execute(f"SELECT COUNT(*) FROM grievances WHERE master_id=id AND department=? AND status NOT IN (?,?,?) "
+                              f"AND stage IN ({held})", (info["department"], *CLOSED, *HELD)).fetchone()[0]
+            if n >= target:
+                break
+            ward = rng.choice(list(WARDS))
+            lat, lng = WARDS[ward]
+            point = (lat + geo_rng.uniform(-0.008, 0.008), lng + geo_rng.uniform(-0.008, 0.008))
+            # Complaint lasts the SLA and Warning half of it: anywhere up to 1.25 x SLA is still with the department
+            created = now() - timedelta(hours=info["sla_hours"] * rng.uniform(0.1, 1.25))
+            create_grievance(complaint_text(cat, rng, ward), ward, channel=rng.choice(["Web", "WhatsApp", "Mobile App", "Call Centre"]),
+                             created=created, reindex=False, point=point, geo_source="seed", citizen_id=rng.choice(citizens))

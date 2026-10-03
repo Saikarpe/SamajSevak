@@ -20,6 +20,17 @@ Officer = Depends(auth.require_officer)
 Citizen = Depends(auth.optional_citizen)
 
 
+def _visible(gid: str, officer: dict):
+    """The report, if this officer may open it: a department head only sees its own department's
+    issues while they are at the Complaint / Warning stage (afterwards they are with the strike bodies)."""
+    g = services.get_grievance(gid)
+    if not g:
+        raise HTTPException(404, "Grievance not found")
+    if not services.visible(g, auth.scope(officer)):
+        raise HTTPException(403, "This issue is not with your department at its current stage")
+    return g
+
+
 @asynccontextmanager
 async def lifespan(_):
     db.init()
@@ -114,7 +125,9 @@ def meta():
             "stages": [{"stage": s, "authority": who} for s, who, _ in ESCALATION_STAGES],
             "embeddings": embed.available(), "model_metrics": _metrics(),
             # only present while no OFFICER_PASSWORD is configured (hosted demo)
-            "demo_login": {"username": auth.DEMO_USER, "password": auth.DEMO_PASSWORD} if auth.is_demo() else None}
+            "demo_login": {"username": auth.DEMO_USER, "password": auth.DEMO_PASSWORD} if auth.is_demo() else None,
+            "demo_staff": [{k: a[k] for k in ("username", "name", "role", "department")} for a in auth.staff_accounts()]
+                          if auth.is_demo() else None}
 
 
 @app.post("/api/auth/login")
@@ -124,7 +137,7 @@ def login(body: LoginIn):
 
 @app.get("/api/auth/me")
 def me(officer: dict = Officer):
-    return {"username": officer["u"], "name": officer["n"]}
+    return {"username": officer["u"], "name": officer["n"], "role": officer.get("r", "admin"), "department": officer.get("d")}
 
 
 @app.post("/api/citizen/login")
@@ -139,7 +152,7 @@ def citizen_login(body: CitizenIn):
 @app.get("/api/citizen/grievances")
 def my_grievances(citizen: Optional[dict] = Citizen):
     if not citizen:
-        raise HTTPException(401, "Citizen login required")
+        raise HTTPException(401, auth.CITIZEN_EXPIRED)
     services.tick()
     return services.citizen_grievances(citizen["c"])
 
@@ -156,7 +169,8 @@ def analyze(body: AnalyzeIn, officer: Optional[dict] = Depends(auth.optional_off
 
 
 @app.post("/api/grievances")
-def create(body: GrievanceIn, request: Request, tasks: BackgroundTasks, citizen: Optional[dict] = Citizen):
+def create(body: GrievanceIn, request: Request, tasks: BackgroundTasks,
+           citizen: Optional[dict] = Depends(auth.citizen_or_anonymous)):
     g = services.create_grievance(
         body.text, body.ward, body.citizen_name, body.phone, body.channel, point=body.point(), geo_source=body.geo_source,
         photo=_photo(body.photo), citizen_id=citizen and citizen["c"], citizen_category=body.category(),
@@ -205,29 +219,30 @@ def public_stats():
 
 
 # ---------------- officer console (login required) ----------------
-@app.get("/api/grievances", dependencies=[Officer])
+@app.get("/api/grievances")
 def list_(status: str = None, category: str = None, priority: str = None, ward: str = None, q: str = None,
-          limit: int = 200, stage: str = None, flagged: bool = False):
+          limit: int = 200, stage: str = None, flagged: bool = False, department: str = None, officer: dict = Officer):
     services.tick()
-    return services.list_grievances(status, category, priority, ward, q, limit, stage, flagged)
+    return services.list_grievances(status, category, priority, ward, q, limit, stage, flagged, department, auth.scope(officer))
 
 
-@app.get("/api/grievances/{gid}", dependencies=[Officer])
-def get(gid: str):
+@app.get("/api/grievances/{gid}")
+def get(gid: str, officer: dict = Officer):
     services.tick()
-    g = services.get_grievance(gid)
-    if not g:
-        raise HTTPException(404, "Grievance not found")
+    g = _visible(gid, officer)
     # refresh similar cases and duplicates against the live index
     live = engine.analyze(g["text"], g["ward"], exclude_id=gid, point=services.point_of(g), category=g["category"])
     mine = {r["id"] for r in g["reports"]}  # reports already on this issue are not "duplicates" of it
-    g["live_similar"] = [s for s in live["similar_cases"] if s["id"] not in mine]
-    g["live_duplicates"] = [s for s in live["possible_duplicates"] if s["id"] not in mine]
+    # a department head is shown matches from its own department only
+    other = lambda s: s["id"] in mine or bool(auth.scope(officer) and CATEGORIES[s["category"]]["department"] != g["department"])
+    g["live_similar"] = [s for s in live["similar_cases"] if not other(s)]
+    g["live_duplicates"] = [s for s in live["possible_duplicates"] if not other(s)]
     return services.officer_view(g)
 
 
-@app.get("/api/grievances/{gid}/photo", dependencies=[Officer])
-def photo(gid: str):
+@app.get("/api/grievances/{gid}/photo")
+def photo(gid: str, officer: dict = Officer):
+    _visible(gid, officer)
     f = services.photo_file(gid)
     if not f:
         raise HTTPException(404, "No photo attached")
@@ -240,6 +255,9 @@ def update(gid: str, body: UpdateIn, officer: dict = Officer):
         raise HTTPException(400, "Invalid status")
     if body.category and body.category not in CATEGORIES:
         raise HTTPException(400, "Invalid category")
+    _visible(gid, officer)
+    if body.master_id and body.master_id != gid:
+        _visible(body.master_id, officer)  # can only link to an issue this officer can see
     g = services.update_grievance(gid, body.status, body.note, body.assigned_to, body.resolution_note,
                                   actor=officer["n"], category=body.category,
                                   resolution_photo=_photo(body.resolution_photo), master_id=body.master_id)
@@ -248,12 +266,9 @@ def update(gid: str, body: UpdateIn, officer: dict = Officer):
     return services.officer_view(g)
 
 
-@app.post("/api/grievances/{gid}/draft", dependencies=[Officer])
-def draft(gid: str):
-    g = services.get_grievance(gid)
-    if not g:
-        raise HTTPException(404, "Grievance not found")
-    return llm.draft(g)
+@app.post("/api/grievances/{gid}/draft")
+def draft(gid: str, officer: dict = Officer):
+    return llm.draft(_visible(gid, officer))
 
 
 @app.get("/api/model", dependencies=[Officer])
@@ -261,33 +276,36 @@ def model_info():
     return {"verified_labels": services.verified_count(), "trained_on_verified": _metrics().get("verified_rows", 0)}
 
 
-@app.post("/api/model/retrain", dependencies=[Officer])
-def retrain():
+@app.post("/api/model/retrain")
+def retrain(officer: dict = Officer):
     """Retrain on the synthetic templates + every officer-verified complaint, then hot-swap the model."""
+    if auth.scope(officer):
+        raise HTTPException(403, "Only the duty officer or a strike body can retrain the shared model")
     m = train.main()
     engine.load()
     return {k: m[k] for k in ("verified_rows", "holdout_accuracy", "holdout_size", "train_size", "test_size")}
 
 
-@app.get("/api/stats", dependencies=[Officer])
-def stats():
+# a department head's dashboards cover the issues in its own portal only
+@app.get("/api/stats")
+def stats(officer: dict = Officer):
     services.tick()
-    return services.stats()
+    return services.stats(auth.scope(officer))
 
 
-@app.get("/api/analytics", dependencies=[Officer])
-def analytics():
-    return services.analytics()
+@app.get("/api/analytics")
+def analytics(officer: dict = Officer):
+    return services.analytics(auth.scope(officer))
 
 
-@app.get("/api/hotspots", dependencies=[Officer])
-def hotspots():
-    return services.hotspots()
+@app.get("/api/hotspots")
+def hotspots(officer: dict = Officer):
+    return services.hotspots(auth.scope(officer))
 
 
-@app.get("/api/alerts", dependencies=[Officer])
-def alerts():
-    return services.alerts()
+@app.get("/api/alerts")
+def alerts(officer: dict = Officer):
+    return services.alerts(auth.scope(officer))
 
 
 # Serve built React app (single-command deployment)

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Area, AreaChart, Bar as RBar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { AlarmClock, CheckCircle2, Flame, Inbox, Layers, Siren, Star, Timer, TrendingUp } from 'lucide-react'
-import { api, fmtHours, PRIORITY_COLORS, STAGE_COLORS, timeAgo } from '../api'
+import { api, fmtHours, PRIORITY_COLORS, scopeLabel, session, STAGE_COLORS, timeAgo } from '../api'
 import { Card, PriorityBadge, StageBadge, Stat, StatusBadge } from '../components/ui'
 
 export default function Dashboard() {
@@ -19,7 +19,7 @@ export default function Dashboard() {
   return (
     <>
       <div className="page-head">
-        <div><h2>Command Center</h2><p>Real-time view of citizen grievances, AI-prioritised for action.</p></div>
+        <div><h2>Command Center</h2><p>Real-time view of citizen grievances, AI-prioritised for action. Showing: <b>{scopeLabel(session.get())}</b></p></div>
         <Link className="btn saffron" to="/citizen">+ New grievance</Link>
       </div>
       <div className="grid g4" style={{ marginBottom: 16 }}>

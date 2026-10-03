@@ -1,7 +1,7 @@
 import { Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom'
 import { BarChart3, BrainCircuit, FolderHeart, LayoutDashboard, ListChecks, Lock, LogOut, MapPinned, MessageSquarePlus, Scale, SearchCheck, ShieldCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { api, session } from './api'
+import { api, scopeLabel, session } from './api'
 import Dashboard from './pages/Dashboard'
 import Submit from './pages/Submit'
 import Track from './pages/Track'
@@ -49,9 +49,12 @@ export default function App() {
         </nav>
         <div className="sidebar-foot">
           {officer && (
-            <div className="row-flex between" style={{ marginBottom: 8 }}>
-              <span>{officer.name}</span>
-              <button className="link" onClick={() => session.set(null)} title="Sign out"><LogOut size={14} /> Sign out</button>
+            <div style={{ marginBottom: 8 }}>
+              <div className="row-flex between">
+                <span>{officer.name}</span>
+                <button className="link" onClick={() => session.set(null)} title="Sign out"><LogOut size={14} /> Sign out</button>
+              </div>
+              <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>{scopeLabel(officer)}</div>
             </div>
           )}
           <div><span className="dot" />AI engine online</div>

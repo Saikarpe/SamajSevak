@@ -381,7 +381,7 @@ const shadow = () => ({ type: 'outer', color: '000000', blur: 8, offset: 2, angl
     s.addText('Thank you', { x: 0.6, y: 2.3, w: 12.1, h: 1.1, fontFace: H, fontSize: 54, bold: true, color: C.white, align: 'center', margin: 0, isTextBox: true });
     s.addText('SamajSevak — every voice heard, every issue followed through.', { x: 0.6, y: 3.4, w: 12.1, h: 0.6, fontFace: B, fontSize: 20, color: C.sky, align: 'center', margin: 0, isTextBox: true });
     s.addText([
-      { text: 'GitHub: ', options: { bold: true, color: C.sky } }, { text: 'github.com/<your-username>/samajsevak', options: { color: C.white, breakLine: true } },
+      { text: 'GitHub: ', options: { bold: true, color: C.sky } }, { text: 'github.com/Saikarpe/SamajSevak', options: { color: C.white, breakLine: true } },
       { text: 'Run: ', options: { bold: true, color: C.sky } }, { text: 'docker build -t samajsevak . && docker run -p 8000:8000 samajsevak', options: { color: C.white } },
     ], { x: 2.2, y: 4.5, w: 8.9, h: 1.0, fontFace: B, fontSize: 16, align: 'center', margin: 0, paraSpaceAfter: 6, isTextBox: true });
     s.addText('Team Viper  ·  Hack2Ignite  ·  AI-04', { x: 0.6, y: 6.5, w: 12.1, h: 0.4, fontFace: B, fontSize: 14, color: '94A3B8', align: 'center', margin: 0, isTextBox: true });

@@ -758,6 +758,11 @@ def generate_training(n_per_class: int = 400, seed: int = 7, n_devanagari: int =
     return rows
 
 
+def complaint_text(category: str, rng: random.Random, ward: str) -> str:
+    """One fresh English complaint for the category (demo top-up of the department queues)."""
+    return _fill(rng.choice(T[category]), rng, ward)
+
+
 def generate_history(n: int = 420, seed: int = 11):
     """Historical grievances with ward, timestamps and resolution info."""
     rng = random.Random(seed)

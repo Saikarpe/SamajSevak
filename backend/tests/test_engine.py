@@ -284,6 +284,36 @@ def test_five_stage_escalation(client, officer):
     assert client.get(f"/api/track/{gid}").json()["stage"] == "Strike 3"
 
 
+def staff(client, username):
+    r = client.post("/api/auth/login", json={"username": username, "password": auth.DEMO_PASSWORD})
+    assert r.status_code == 200, r.text
+    return {"Authorization": f"Bearer {r.json()['token']}"}
+
+
+def test_department_heads_see_only_their_issues_until_escalated(client, officer):
+    g = submit(client, "Sparks coming from the transformer near the vegetable market, power keeps tripping", lat=18.5150, lng=73.8560)
+    dept = case(client, officer, g["id"])["department"]
+    head = next(u for u, d in auth.DEPARTMENT_USERS.items() if d == dept)
+    other = next(u for u, d in auth.DEPARTMENT_USERS.items() if d != dept)
+    mine, theirs, strike = staff(client, head), staff(client, other), staff(client, "strike2")
+    rows = client.get("/api/grievances", headers=mine).json()
+    assert g["id"] in [r["id"] for r in rows]
+    assert {r["department"] for r in rows} == {dept} and {r["stage"] for r in rows} <= set(services.HELD)
+    assert g["id"] not in [r["id"] for r in client.get("/api/grievances", headers=theirs).json()]
+    assert client.get(f"/api/grievances/{g['id']}", headers=theirs).status_code == 403
+    assert client.patch(f"/api/grievances/{g['id']}", json={"note": "x"}, headers=theirs).status_code == 403
+    assert client.post("/api/model/retrain", headers=mine).status_code == 403
+    # strike bodies watch every department, at every stage
+    assert len({r["department"] for r in client.get("/api/grievances?limit=500", headers=strike).json()}) > 1
+    # still a Warning: stays with the department; after Strike 1 it leaves the department's portal
+    services.run_escalations(datetime.strptime(case(client, officer, g["id"])["stage_due"], services.FMT) + timedelta(seconds=1))
+    assert client.get(f"/api/grievances/{g['id']}", headers=mine).json()["stage"] == "Warning"
+    services.run_escalations(datetime.strptime(case(client, officer, g["id"])["stage_due"], services.FMT) + timedelta(seconds=1))
+    assert client.get(f"/api/grievances/{g['id']}", headers=mine).status_code == 403
+    assert client.get(f"/api/grievances/{g['id']}", headers=strike).json()["stage"] == "Strike 1"
+    assert client.get("/api/stats", headers=mine).json()["stages"].get("Strike 1", 0) == 0
+
+
 def test_resolved_issues_do_not_escalate_and_rejection_keeps_the_record(client, officer):
     g = submit(client, "Bus stop shelter is broken near the stadium and people wait in the rain", lat=18.5200, lng=73.8200)
     client.patch(f"/api/grievances/{g['id']}", json={"status": "Resolved", "note": "Shelter repaired"}, headers=officer)

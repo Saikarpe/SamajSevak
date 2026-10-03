@@ -20,9 +20,12 @@ async function call(path, opts = {}) {
     headers: { 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }), ...(me && { 'X-Citizen-Token': me }) },
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   })
-  if (r.status === 401 && token && !path.startsWith('/api/citizen')) session.set(null) // expired: back to the login page
-  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText)
-  return r
+  if (r.ok) return r
+  const detail = (await r.json().catch(() => ({}))).detail
+  // expired citizen token: sign the citizen out so they sign in again (never file a report anonymously)
+  if (r.status === 401 && me && detail?.startsWith('Citizen session expired')) citizen.set(null)
+  else if (r.status === 401 && token && !path.startsWith('/api/citizen')) session.set(null) // expired: back to the login page
+  throw new Error(detail || r.statusText)
 }
 const req = (path, opts) => call(path, opts).then((r) => r.json())
 
@@ -54,6 +57,9 @@ export const PRIORITY_COLORS = { Critical: '#dc2626', High: '#ea580c', Medium: '
 export const STATUS_COLORS = { Submitted: '#5c6773', Assigned: '#4f46e5', 'In Progress': '#0284c7', Resolved: '#0d9488', 'Not Satisfied': '#dc2626', Closed: '#16a34a', Rejected: '#8a949e' }
 // escalation ladder: Complaint and Warning are department-level, the strikes go upward
 export const STAGE_COLORS = { Complaint: '#5c6773', Warning: '#d97706', 'Strike 1': '#ea580c', 'Strike 2': '#dc2626', 'Strike 3': '#991b1b' }
+// who an officer login covers: a department head only its own department's Complaint / Warning issues
+export const scopeLabel = (o) => (o?.role === 'department' ? `${o.department} · Complaint & Warning stages`
+  : o?.role === 'strike' ? 'Strike body · all departments' : 'Duty officer · all departments')
 export const isOpen = (status) => !['Resolved', 'Closed', 'Rejected'].includes(status)
 
 export function timeAgo(ts) {

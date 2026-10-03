@@ -11,3 +11,4 @@ backend/data/uploads/
 backend/models/fastembed_cache/
 backend/models/embedding_cache.npz
 *.previous.pptx
+backend/data/.secret
